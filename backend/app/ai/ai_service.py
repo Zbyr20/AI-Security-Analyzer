@@ -11,7 +11,7 @@ class AIService:
         # Foundry Local adresi
         self.base_url = os.getenv(
             "FOUNDRY_BASE_URL",
-            "http://127.0.0.1:52511/v1"
+            "http://127.0.0.1:62256  /v1"
         )
 
         # Kullanacağımız model
@@ -44,7 +44,6 @@ class AIService:
         # enable_thinking=False:
         # Qwen3'ün resmi hard-switch yöntemidir.
         user_prompt = f"""
-/no_think
 
 {prompt}
 """
@@ -77,7 +76,7 @@ class AIService:
             top_p=0.8,
 
             # Raporun yarıda kesilmesini önlemek için
-            max_tokens=2000,
+            
 
             # Qwen3 thinking'i kapatmayı OpenAI-compatible
             # API üzerinden de talep ediyoruz.
@@ -126,7 +125,26 @@ class AIService:
         )
 
         user_prompt = f"""
-        /no_think
+KRİTİK KURAL:
+
+Bu rapor yalnızca verilen JSON verilerinden oluşturulmalıdır.
+
+JSON'da açıkça bulunmayan hiçbir güvenlik açığını, saldırı türünü,
+alan adını, tarih bilgisini, sayı veya tarama sonucunu üretme.
+
+Örneğin JSON'da "sql_injection": true bulunmuyorsa
+SQL Injection hakkında bulgu oluşturma.
+
+JSON'da "xss": true bulunmuyorsa
+XSS hakkında bulgu oluşturma.
+
+Bir güvenlik kontrolünün sonucu JSON'da bulunmuyorsa,
+o kontrol hakkında yorum yapma.
+
+Eksik veri = güvenlik açığı değildir.
+
+Yalnızca mevcut verileri açıklayabilirsin.
+
 Aşağıdaki JSON, bir web sitesine ait güvenlik taraması sonucudur.
 
 SADECE bu JSON içerisinde bulunan bilgileri kullan.
@@ -176,6 +194,7 @@ Kurallar:
 6. Düşünme sürecini gösterme.
 7. <think> etiketi üretme.
 8. Raporu gereksiz yere uzatma.
+9. Rapor bir sayfayı geçmesin ve bitince sonuna rapor sonu yaz ki anlayayım.
 """
 
         report = self.ask(user_prompt)
