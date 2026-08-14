@@ -1,29 +1,24 @@
 import json
-import os
 
 from openai import OpenAI
+
+from app.config import (
+    FOUNDRY_BASE_URL,
+    MODEL_NAME,
+    API_KEY,
+)
 
 
 class AIService:
 
     def __init__(self):
 
-        # Foundry Local adresi
-        self.base_url = os.getenv(
-            "FOUNDRY_BASE_URL",
-            "http://127.0.0.1:62256  /v1"
-        )
+        self.base_url = FOUNDRY_BASE_URL
+        self.model = MODEL_NAME
 
-        # Kullanacağımız model
-        self.model = os.getenv(
-            "FOUNDRY_MODEL",
-            "qwen3-4b-cuda-gpu"
-        )
-
-        # OpenAI uyumlu Foundry Local API client
         self.client = OpenAI(
             base_url=self.base_url,
-            api_key="local"
+            api_key=API_KEY,
         )
 
     # ---------------------------------------------------------
@@ -32,75 +27,81 @@ class AIService:
 
     def ask(self, prompt: str) -> str:
 
-        print("\n[AI] Model isteği gönderiliyor...")
+        print()
+        print("[AI] Model isteği gönderiliyor...")
         print(f"[AI] Model: {self.model}")
         print(f"[AI] Base URL: {self.base_url}")
 
-        # Qwen3 için non-thinking modu.
-        #
-        # /no_think:
-        # Modelden düşünme bölümünü üretmemesini istiyoruz.
-        #
-        # enable_thinking=False:
-        # Qwen3'ün resmi hard-switch yöntemidir.
-        user_prompt = f"""
+        # Qwen3 non-thinking modu.
+        # Bunu doğrudan prompt içinde kullanıyoruz çünkü
+        # Foundry üzerinden yaptığımız testte /no_think çalıştı.
+        user_prompt = f"/no_think\n\n{prompt}"
 
-{prompt}
-"""
+        try:
 
-        response = self.client.chat.completions.create(
+            response = self.client.chat.completions.create(
+                model=self.model,
 
-            model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Sen profesyonel bir web güvenlik "
+                            "raporlama asistanısın.\n"
+                            "Yalnızca verilen güvenlik taraması "
+                            "verilerini kullan.\n"
+                            "Verilmeyen güvenlik açıklarını varsayma.\n"
+                            "Yalnızca nihai cevabı üret.\n"
+                            "Türkçe yaz."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": user_prompt,
+                    },
+                ],
 
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        
-                       " /no_think Sen profesyonel bir web güvenlik analiz asistanısın.\n"
-                        "Yalnızca sana verilen güvenlik taraması verilerini kullan.\n"
-                        "Verilmeyen bir güvenlik açığını varsayma.\n"
-                        "Kısa, doğru ve profesyonel Türkçe bir güvenlik raporu üret.\n"
-                        "Yanıtında düşünme sürecini gösterme.\n"
-                        "Yanıt yalnızca nihai rapor olmalıdır."
-                    )
-                },
-                {
-                    "role": "user /no_think",
-                    "content": user_prompt
-                }
-            ],
+                temperature=0.2,
+                top_p=0.8,
 
-            # Qwen3 non-thinking için önerilen değerler
-            temperature=0.2,
-            top_p=0.8,
+                # Kısa ama yeterli rapor alanı
+                max_tokens=1200,
+            )
 
-            # Raporun yarıda kesilmesini önlemek için
-            
+        except Exception as exc:
 
-            # Qwen3 thinking'i kapatmayı OpenAI-compatible
-            # API üzerinden de talep ediyoruz.
-            extra_body={
-                "enable_thinking": False
-            }
-        )
+            raise RuntimeError(
+                f"AI modeline bağlanırken hata oluştu: {exc}"
+            ) from exc
 
         print("[AI] Model cevap verdi.")
 
-        # Finish reason
-        finish_reason = response.choices[0].finish_reason
+        if not response.choices:
 
-        print(f"[AI] Finish reason: {finish_reason}")
+            raise RuntimeError(
+                "Model herhangi bir cevap döndürmedi."
+            )
 
-        # Modelin döndürdüğü asıl içerik
-        content = response.choices[0].message.content
-        
+        choice = response.choices[0]
+
+        print(
+            f"[AI] Finish reason: "
+            f"{choice.finish_reason}"
+        )
+
+        content = choice.message.content
 
         if not content:
-         raise RuntimeError("Model boş güvenlik raporu döndürdü.")
-        
+
+            raise RuntimeError(
+                "Model boş cevap döndürdü."
+            )
+
+        content = content.strip()
+
         print(
-            f"[AI] Ham cevap uzunluğu: {len(content)} karakter"
+            f"[AI] Ham cevap uzunluğu: "
+            f"{len(content)} karakter"
         )
 
         return content
@@ -111,111 +112,97 @@ class AIService:
 
     def generate_security_report(
         self,
-        security_result: dict
+        security_result: dict,
     ) -> str:
 
-        print("[AI] Güvenlik verisi hazırlanıyor...")
-        print("[AI] Güvenlik raporu oluşturuluyor...")
+        print(
+            "[AI] Güvenlik verisi hazırlanıyor..."
+        )
 
-        # Scanner'dan gelen JSON'u düzgün biçimde modele gönderiyoruz.
         security_json = json.dumps(
             security_result,
             ensure_ascii=False,
-            indent=2
+            indent=2,
+        )
+
+        print(
+            "[AI] Güvenlik raporu oluşturuluyor..."
         )
 
         user_prompt = f"""
-KRİTİK KURAL:
+Aşağıdaki JSON bir web sitesinin güvenlik taraması sonucudur.
 
-Bu rapor yalnızca verilen JSON verilerinden oluşturulmalıdır.
-
-JSON'da açıkça bulunmayan hiçbir güvenlik açığını, saldırı türünü,
-alan adını, tarih bilgisini, sayı veya tarama sonucunu üretme.
-
-Örneğin JSON'da "sql_injection": true bulunmuyorsa
-SQL Injection hakkında bulgu oluşturma.
-
-JSON'da "xss": true bulunmuyorsa
-XSS hakkında bulgu oluşturma.
-
-Bir güvenlik kontrolünün sonucu JSON'da bulunmuyorsa,
-o kontrol hakkında yorum yapma.
-
-Eksik veri = güvenlik açığı değildir.
-
-Yalnızca mevcut verileri açıklayabilirsin.
-
-Aşağıdaki JSON, bir web sitesine ait güvenlik taraması sonucudur.
-
-SADECE bu JSON içerisinde bulunan bilgileri kullan.
+SADECE bu JSON içerisindeki bilgileri kullan.
 
 JSON:
-
 {security_json}
 
-Bu verilere dayanarak kısa ve profesyonel bir Türkçe güvenlik raporu oluştur.
+Verilere dayanarak kısa ve profesyonel bir Türkçe
+güvenlik raporu oluştur.
 
-Rapor tam olarak şu bölümlerden oluşsun:
+Şu yapıyı kullan:
 
 ## Yönetici Özeti
 
-En fazla 3 cümle.
+Kısa özet.
 
 ## Teknik Bulgular
 
-Önemli güvenlik bulgularını listele.
+Yalnızca JSON'da bulunan önemli bulgular.
 
-Her bulgu şu formatta olsun:
+Her bulgu:
 
-### Bulgu: [bulgu adı]
-- Durum: Olumlu / Olumsuz
-- Risk: Düşük / Orta / Yüksek / Kritik
-- Açıklama: [tek kısa cümle]
+### Bulgu: [isim]
+
+- Durum: Olumlu veya Olumsuz
+- Risk: Düşük, Orta, Yüksek veya Kritik
+- Açıklama: Tek kısa cümle
 
 ## Risk Seviyesi
 
-Tek cümle ile genel risk seviyesini belirt.
+Genel risk seviyesi ve tek cümle gerekçe.
 
 ## Çözüm Önerileri
 
-En fazla 5 maddelik çözüm önerisi ver.
+Yalnızca JSON'daki olumsuz bulgulara yönelik öneriler.
 
 ## Sonuç
 
-En fazla 2 cümlelik sonuç yaz.
+Kısa sonuç.
 
 Kurallar:
 
-1. JSON'da bulunmayan bir açığı varsayma.
-2. Aynı bulguyu tekrar etme.
-3. Gereksiz teknik açıklama yapma.
-4. İngilizce cevap verme.
-5. Yalnızca nihai raporu üret.
-6. Düşünme sürecini gösterme.
-7. <think> etiketi üretme.
-8. Raporu gereksiz yere uzatma.
-9. Rapor bir sayfayı geçmesin ve bitince sonuna rapor sonu yaz ki anlayayım.
+- JSON'da olmayan açık üretme.
+- SQL Injection, XSS, IDOR vb. bilgiler JSON'da yoksa bunlardan bahsetme.
+- DNS kaydının boş olmasını tek başına güvenlik açığı kabul etme.
+- Aynı bulguyu tekrar etme.
+- Gerçek olmayan tarih, domain, CVE, port veya sayı üretme.
+- Tarama yapılmamış bir sistemi taranmış gibi gösterme.
+- Yalnızca mevcut verileri yorumla.
+- Gereksiz açıklama yapma.
 """
 
         report = self.ask(user_prompt)
 
-        print("[AI] Güvenlik raporu alındı.")
+        print(
+            "[AI] Güvenlik raporu alındı."
+        )
 
         return report
 
     # ---------------------------------------------------------
-    # ÖZET
+    # RAPOR ÖZETLEME
     # ---------------------------------------------------------
 
     def summarize_report(
         self,
-        report: str
+        report: str,
     ) -> str:
 
         prompt = f"""
-Aşağıdaki güvenlik raporunu Türkçe olarak çok kısa şekilde özetle.
+Aşağıdaki güvenlik raporunu kısa Türkçe özetle.
 
-Raporda olmayan bilgi ekleme.
+Yalnızca raporda bulunan bilgileri kullan.
 
 Rapor:
 
@@ -230,7 +217,7 @@ Rapor:
 
     def chat(
         self,
-        message: str
+        message: str,
     ) -> str:
 
         return self.ask(message)
