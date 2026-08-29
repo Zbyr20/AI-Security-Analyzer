@@ -26,5 +26,5 @@ class SecurityScanner:
             ssl=ssl_result,
             headers=header_result,
             cookies=cookie_result,
-            dns=dns_result
+            dns=dns_result,
         )

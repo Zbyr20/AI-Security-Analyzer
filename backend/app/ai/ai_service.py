@@ -35,7 +35,7 @@ class AIService:
         # Qwen3 non-thinking modu.
         # Bunu doğrudan prompt içinde kullanıyoruz çünkü
         # Foundry üzerinden yaptığımız testte /no_think çalıştı.
-        user_prompt = f"/no_think\n\n{prompt}"
+        user_prompt = f"/no_think\n{prompt}"
 
         try:
 
@@ -61,11 +61,11 @@ class AIService:
                     },
                 ],
 
-                temperature=0.2,
-                top_p=0.8,
+                temperature=0.1,
+                top_p=0.7,
 
                 # Kısa ama yeterli rapor alanı
-                max_tokens=1200,
+                max_tokens=800,
             )
 
         except Exception as exc:
@@ -97,7 +97,19 @@ class AIService:
                 "Model boş cevap döndürdü."
             )
 
-        content = content.strip()
+        content = str(content).strip()
+
+        if "<think>" in content.lower():
+            lower = content.lower()
+            start = lower.find("<think>")
+            end = lower.find("</think>")
+            if end != -1 and start != -1:
+                content = content[end + len("</think>") :]
+            elif start != -1:
+                content = content[:start]
+
+        content = content.replace("\\r\\n", "\\n").replace("\\r", "\\n")
+        content = "\n".join(line.rstrip() for line in content.split("\n"))
 
         print(
             f"[AI] Ham cevap uzunluğu: "
@@ -140,6 +152,15 @@ JSON:
 Verilere dayanarak kısa ve profesyonel bir Türkçe
 güvenlik raporu oluştur.
 
+ÖNEMLİ KURALLAR:
+- Düşünme sürecini yazma.
+- Sadece nihai rapor çıktısını ver.
+- <think> ... </think> bloklarını çıkar.
+- Yalnızca markdown formatında yaz.
+- Her başlık ve madde ayrı satırda olsun.
+- Tek bir paragraf halinde yazma.
+- Tek bir satırda uzun metin üretme.
+
 Şu yapıyı kullan:
 
 ## Yönetici Özeti
@@ -147,10 +168,6 @@ güvenlik raporu oluştur.
 Kısa özet.
 
 ## Teknik Bulgular
-
-Yalnızca JSON'da bulunan önemli bulgular.
-
-Her bulgu:
 
 ### Bulgu: [isim]
 
@@ -164,7 +181,8 @@ Genel risk seviyesi ve tek cümle gerekçe.
 
 ## Çözüm Önerileri
 
-Yalnızca JSON'daki olumsuz bulgulara yönelik öneriler.
+- Öneri 1
+- Öneri 2
 
 ## Sonuç
 
@@ -182,13 +200,23 @@ Kurallar:
 - Gereksiz açıklama yapma.
 """
 
-        report = self.ask(user_prompt)
-
-        print(
-            "[AI] Güvenlik raporu alındı."
-        )
-
-        return report
+        try:
+            report = self.ask(user_prompt)
+            print(
+                "[AI] Güvenlik raporu alındı."
+            )
+            return report
+        except Exception as exc:
+            print(
+                "[AI] Model erişilemedi; otomatik yedek rapor dönülüyor. "
+                f"Hata: {exc}"
+            )
+            return (
+                "AI modeli şu an erişilemediği için otomatik yedek rapor üretildi.\n\n"
+                "Tarama verileri başarıyla toplandı.\n"
+                "Lütfen model hizmeti erişilebilir olduğunda raporu yeniden oluşturun.\n\n"
+                f"Tarama sonucu:\n{security_json}"
+            )
 
     # ---------------------------------------------------------
     # RAPOR ÖZETLEME

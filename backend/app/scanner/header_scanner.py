@@ -25,7 +25,7 @@ class HeaderScanner:
 
         except Exception as e:
             return {
-                "error" : str(e)
+                "error" : "Headerlar taranamadı!!"
             }
 
     def _build_result(self, headers) ->dict:
