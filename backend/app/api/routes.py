@@ -16,9 +16,16 @@ class ScanRequest(BaseModel):
 @router.post("/scan")
 def scan_website(request: ScanRequest):
 
+    # Kullanıcı hatası (geçersiz URL) → 400; sunucu tarafı hata → 500.
     try:
         validated_url = validator.validate(request.url)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e),
+        )
 
+    try:
         security_result = scanner.scan(validated_url)
         security_data = security_result.to_dict()
 
