@@ -2,6 +2,7 @@ from app.scanner.ssl_scanner import SSLScanner
 from app.scanner.header_scanner import HeaderScanner
 from app.scanner.cookie_scanner import CookieScanner
 from app.scanner.dns_scanner import DNSScanner
+from app.scanner.tls_scanner import TLSScanner
 
 from app.models.security_result import SecurityResult
 
@@ -13,6 +14,7 @@ class SecurityScanner:
         self.header_scanner = HeaderScanner()
         self.cookie_scanner = CookieScanner()
         self.dns_scanner = DNSScanner()
+        self.tls_scanner = TLSScanner()
 
     def scan(self, url: str) -> SecurityResult:
 
@@ -20,6 +22,7 @@ class SecurityScanner:
         header_result = self.header_scanner.scan(url)
         cookie_result = self.cookie_scanner.scan(url)
         dns_result = self.dns_scanner.scan(url)
+        tls_result = self.tls_scanner.scan(url)
 
         return SecurityResult(
             url=url,
@@ -27,4 +30,5 @@ class SecurityScanner:
             headers=header_result,
             cookies=cookie_result,
             dns=dns_result,
+            tls=tls_result,
         )
