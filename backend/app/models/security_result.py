@@ -7,12 +7,14 @@ class SecurityResult:
         headers: dict,
         cookies: dict,
         dns: dict | None = None,
+        tls: dict | None = None,
     ):
         self.url = url
         self.ssl = ssl
         self.headers = headers
         self.cookies = cookies
         self.dns = dns or {}
+        self.tls = tls or {}
 
     def to_dict(self) -> dict:
         return {
@@ -21,4 +23,5 @@ class SecurityResult:
             "headers": self.headers,
             "cookies": self.cookies,
             "dns": self.dns,
+            "tls": self.tls,
         }
