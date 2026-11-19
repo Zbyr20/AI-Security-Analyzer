@@ -1,4 +1,5 @@
 import json
+import re
 
 from openai import OpenAI
 
@@ -9,14 +10,45 @@ from app.config import (
 )
 
 
+_THINK_BLOCK = re.compile(r"<think>.*?</think>", re.IGNORECASE | re.DOTALL)
+
+
+def clean_model_output(content: str) -> str:
+    """Model cevabındaki <think> bölümlerini ve satır sonu farklarını temizler.
+
+    - Kapalı <think>...</think> blokları silinir (birden fazla olabilir).
+    - Sadece </think> varsa (açılış etiketi atlanmışsa) öncesi silinir.
+    - Sadece <think> varsa (cevap yarıda kesilmişse) sonrası silinir.
+    - Windows (\\r\\n) ve eski Mac (\\r) satır sonları \\n yapılır,
+      satır sonundaki boşluklar silinir.
+    """
+    content = str(content)
+    content = _THINK_BLOCK.sub("", content)
+
+    lower = content.lower()
+    end = lower.find("</think>")
+    if end != -1:
+        content = content[end + len("</think>"):]
+        lower = content.lower()
+
+    start = lower.find("<think>")
+    if start != -1:
+        content = content[:start]
+
+    content = content.replace("\r\n", "\n").replace("\r", "\n")
+    content = "\n".join(line.rstrip() for line in content.split("\n"))
+    return content.strip()
+
+
 class AIService:
 
-    def __init__(self):
+    def __init__(self, client=None):
 
         self.base_url = FOUNDRY_BASE_URL
         self.model = MODEL_NAME
 
-        self.client = OpenAI(
+        # Testlerde sahte istemci verilebilir; normalde gerçek OpenAI istemcisi.
+        self.client = client or OpenAI(
             base_url=self.base_url,
             api_key=API_KEY,
         )
@@ -97,19 +129,13 @@ class AIService:
                 "Model boş cevap döndürdü."
             )
 
-        content = str(content).strip()
+        content = clean_model_output(content)
 
-        if "<think>" in content.lower():
-            lower = content.lower()
-            start = lower.find("<think>")
-            end = lower.find("</think>")
-            if end != -1 and start != -1:
-                content = content[end + len("</think>") :]
-            elif start != -1:
-                content = content[:start]
+        if not content:
 
-        content = content.replace("\\r\\n", "\\n").replace("\\r", "\\n")
-        content = "\n".join(line.rstrip() for line in content.split("\n"))
+            raise RuntimeError(
+                "Model yalnızca düşünme çıktısı döndürdü, rapor boş."
+            )
 
         print(
             f"[AI] Ham cevap uzunluğu: "
