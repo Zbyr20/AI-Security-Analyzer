@@ -1,106 +1,97 @@
 import { useState } from "react";
 
+import "./App.css";
+import Markdown from "./components/Markdown.jsx";
+import ScanSummary from "./components/ScanSummary.jsx";
+import { scanWebsite } from "./lib/api.js";
+
 function App() {
     // Kullanıcının girdiği URL
     const [url, setUrl] = useState("");
 
-    // FastAPI'den dönen sonuç
+    // FastAPI'den dönen sonuç: { url, scan, report }
     const [result, setResult] = useState(null);
+
+    // Kullanıcıya gösterilecek hata mesajı
+    const [error, setError] = useState("");
 
     // Tarama devam ediyor mu?
     const [loading, setLoading] = useState(false);
 
-    // -----------------------------------------------------
-    // FASTAPI'YE TARAMA İSTEĞİ GÖNDER
-    // -----------------------------------------------------
+    // <form> kullandığımız için Enter tuşu da taramayı başlatır.
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+        if (loading) return;
 
-    const scanWebsite = async () => {
-        // Eski sonucu temizle
         setResult(null);
-
-        // Tarama başladı
+        setError("");
         setLoading(true);
 
         try {
-            const response = await fetch(
-                "http://127.0.0.1:8000/scan",
-                {
-                    method: "POST",
-
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-
-                    body: JSON.stringify({
-                        url: url,
-                    }),
-                }
-            );
-
-            // HTTP hatası varsa
-            if (!response.ok) {
-                throw new Error(
-                    "FastAPI isteği başarısız oldu."
-                );
-            }
-
-            // JSON cevabını al
-            const data = await response.json();
-
-            // Sonucu React state'e koy
-            setResult(data);
-
-        } catch (error) {
-
-            console.error(error);
-
-            setResult({
-                error: error.message,
-            });
-
+            setResult(await scanWebsite(url));
+        } catch (err) {
+            console.error(err);
+            // Backend'in "detail" mesajı (örn. geçersiz URL) burada görünür.
+            setError(err.message);
         } finally {
-
-            // Tarama bitti
             setLoading(false);
         }
     };
 
-    // -----------------------------------------------------
-    // ARAYÜZ
-    // -----------------------------------------------------
-
     return (
-        <div>
+        <main className="app">
             <h1>AI Security Analyzer</h1>
 
-            <input
-                type="text"
-                value={url}
-                onChange={(event) =>
-                    setUrl(event.target.value)
-                }
-                placeholder="https://example.com"
-            />
+            <form className="scan-form" onSubmit={handleSubmit}>
+                <label htmlFor="url" className="visually-hidden">
+                    Taranacak URL
+                </label>
+                <input
+                    id="url"
+                    type="text"
+                    inputMode="url"
+                    autoComplete="url"
+                    value={url}
+                    onChange={(event) => setUrl(event.target.value)}
+                    placeholder="https://example.com"
+                    disabled={loading}
+                />
+                <button type="submit" disabled={loading || !url.trim()}>
+                    {loading ? "Tarama yapılıyor..." : "Tara"}
+                </button>
+            </form>
 
-            <button
-                onClick={scanWebsite}
-                disabled={loading}
-            >
-                {loading
-                    ? "Tarama yapılıyor..."
-                    : "Tara"}
-            </button>
+            {loading && (
+                <p className="status" role="status">
+                    Site taranıyor ve AI raporu hazırlanıyor. Bu biraz sürebilir.
+                </p>
+            )}
+
+            {error && (
+                <p className="error" role="alert">
+                    {error}
+                </p>
+            )}
 
             {result && (
-                <pre>
-                    {JSON.stringify(
-                        result,
-                        null,
-                        2
+                <section className="result">
+                    <h2>Sonuç: {result.url}</h2>
+
+                    <ScanSummary scan={result.scan} />
+
+                    {result.report && (
+                        <article className="report">
+                            <Markdown source={result.report} />
+                        </article>
                     )}
-                </pre>
+
+                    <details className="raw">
+                        <summary>Ham tarama verisi (JSON)</summary>
+                        <pre>{JSON.stringify(result.scan, null, 2)}</pre>
+                    </details>
+                </section>
             )}
-        </div>
+        </main>
     );
 }
 
