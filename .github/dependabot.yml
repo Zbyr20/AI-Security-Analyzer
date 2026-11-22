@@ -4,7 +4,20 @@ updates:
     directory: "/backend"
     schedule:
       interval: "weekly"
+    # Küçük (minor/patch) güncellemeler tek PR'da toplanır.
+    # Büyük sürüm (major) güncellemeleri ayrı PR olarak gelir,
+    # çünkü API değişikliği getirebilir ve ayrıca test edilmelidir.
+    groups:
+      pip-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "weekly"
+    groups:
+      npm-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
