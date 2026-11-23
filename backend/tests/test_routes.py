@@ -46,7 +46,17 @@ def test_scan_basarili(client):
     assert client.fake_scanner.calls == ["https://example.com"]
 
 
-@pytest.mark.parametrize("url", ["ftp://example.com", "", "https://"])
+@pytest.mark.parametrize(
+    "url",
+    [
+        "ftp://example.com",
+        "",
+        "https://",
+        "not a url",
+        "https://example.com:99999",
+        "https://google.com@evil.com",
+    ],
+)
 def test_gecersiz_url_400_doner_ve_tarama_yapilmaz(client, url):
     response = client.post("/scan", json={"url": url})
 
