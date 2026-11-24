@@ -4,11 +4,13 @@ from pydantic import BaseModel
 from app.scanner.security_scanner import SecurityScanner
 from app.ai.ai_service import AIService
 from app.validators.url_validator import URLValidator
+from app.validators.target_guard import BlockedTargetError, TargetGuard
 
 router = APIRouter()
 scanner = SecurityScanner()
 ai_service = AIService()
 validator = URLValidator()
+target_guard = TargetGuard()
 
 class ScanRequest(BaseModel):
     url: str
@@ -20,6 +22,15 @@ def scan_website(request: ScanRequest):
     try:
         validated_url = validator.validate(request.url)
     except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e),
+        )
+
+    # SSRF koruması: iç ağ / localhost / bulut metadata adresleri taranmaz.
+    try:
+        target_guard.check(validated_url)
+    except BlockedTargetError as e:
         raise HTTPException(
             status_code=400,
             detail=str(e),

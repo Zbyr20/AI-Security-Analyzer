@@ -1,5 +1,7 @@
-from urllib.request import Request, urlopen
 from http.cookies import SimpleCookie
+from urllib.request import Request
+
+from app.validators.target_guard import safe_urlopen
 
 
 class CookieScanner:
@@ -14,7 +16,7 @@ class CookieScanner:
                 }
             )
 
-            with urlopen(request, timeout=10) as response:
+            with safe_urlopen(request, timeout=10) as response:
                 cookies = response.headers.get_all("Set-Cookie")
 
             return self._build_result(cookies)
