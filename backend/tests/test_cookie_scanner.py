@@ -43,7 +43,7 @@ def test_ag_hatasinda_error_doner(monkeypatch):
     def boom(*args, **kwargs):
         raise OSError("bağlantı yok")
 
-    monkeypatch.setattr("app.scanner.cookie_scanner.urlopen", boom)
+    monkeypatch.setattr("app.scanner.cookie_scanner.safe_urlopen", boom)
     result = CookieScanner().scan("https://example.invalid")
     assert result["cookies_found"] is False
     assert result["cookies"] == []

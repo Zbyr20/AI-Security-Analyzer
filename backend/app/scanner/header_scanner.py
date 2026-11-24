@@ -1,4 +1,6 @@
-from urllib.request import Request, urlopen
+from urllib.request import Request
+
+from app.validators.target_guard import safe_urlopen
 
 class HeaderScanner:
 
@@ -19,7 +21,7 @@ class HeaderScanner:
                     "User-Agent": "AI-Security-Analyzer/1.0"
                 }
             )
-            with urlopen(request, timeout=10) as response:
+            with safe_urlopen(request, timeout=10) as response:
                 headers = response.headers
             return self._build_result(headers)
 

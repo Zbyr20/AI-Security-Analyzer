@@ -44,7 +44,7 @@ def test_ag_hatasinda_error_doner(monkeypatch):
     def boom(*args, **kwargs):
         raise OSError("bağlantı yok")
 
-    monkeypatch.setattr("app.scanner.header_scanner.urlopen", boom)
+    monkeypatch.setattr("app.scanner.header_scanner.safe_urlopen", boom)
     assert HeaderScanner().scan("https://example.invalid") == {
         "error": "Headerlar taranamadı!!"
     }
